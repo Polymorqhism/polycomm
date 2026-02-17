@@ -10,7 +10,7 @@
 <h1 align="center">polycomm</h1>
 
 <p align="center">
-  Direct; private.
+  Direct; autonomous.
 </p>
 
 
@@ -27,10 +27,10 @@
 - This solves the problem of having a larger organization viewing everything you do.
 
 ## How?
-- polycomm is a very simple system that uses cURL to transmit messages.
+- polycomm, written in C, is a very simple system that uses TCP sockets to transmit messages with the help of cJSON.
 - There are two types of nodes: the server, and the client. Clients can connect to the server to communicate. The server handles the clients. The server also authenticates users based on a predetermined password automatically created by the server.
-- All messages going through the server are encrypted end-to-end.
 - The design is kept intentionally simple to minimize the number of attack surfaces and points of collapse.
+- Encryption with libsodium is planned in the near future.
 
 ---
 Note: polycomm works entirely in the terminal. GUI support will never be added.
