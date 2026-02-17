@@ -33,4 +33,4 @@
 - Encryption with libsodium is planned in the near future.
 
 ---
-Note: polycomm works entirely in the terminal. GUI support will never be added. Everything breaks if you apply enough pressure, polycomm is not an exception. Usage of this implies you understand potential vulnerabilities which may not be known.
+Note: polycomm works entirely in the terminal. GUI support will never be added. Everything breaks if you apply enough pressure, polycomm is not an exception. Usage of this implies you understand there may be potential vulnerabilities which may not be known.
