@@ -1,40 +1,29 @@
 #include <netinet/in.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "polycomm.h"
+#include "util.h"
 
-int get_choice(void)
+void handle_chat(int client_fd)
 {
-    int c;
-    printf("Are you the client or the server (1 - client; 2 - server)? ");
-    scanf("%1d", &c);
 
-    if(c == 1 || c == 2) {
-        return c;
-    }
-
-    return -1;
-}
-
-void display_banner(void)
-{
-    printf("\033[2J");
-    printf("%s\n\n", banner);
 }
 
 void handle_client_choice(void)
 {
-    char ip[16];
-    uint16_t port;
+    char ip[32];
+    char port[8];
     printf("Enter server IP: ");
-    scanf("%15s", ip);
+    fgets(ip, sizeof(ip), stdin);
     printf("Enter server port: ");
-    scanf("%5hu", &port);
-
-    printf("\nIP set as %s and port as %hu.\n", ip, port);
+    fgets(port, sizeof(port), stdin);
+    ip[strcspn(ip, "\n")] = 0;
+    port[strcspn(port, "\n")] = 0;
+    printf("\nIP set as %s and port as %s.\n", ip, port);
 
     int client_fd;
     struct sockaddr_in server_addr;
@@ -44,7 +33,8 @@ void handle_client_choice(void)
     }
 
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
+    uint16_t port_int = atoi(port);
+    server_addr.sin_port = htons(port_int);
 
     if(inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
         perror("Bad IP.");
@@ -58,32 +48,35 @@ void handle_client_choice(void)
     }
 
     puts("Connection successful.");
+    printf("\033[2J");
+    handle_chat(client_fd);
 }
 
 void handle_server_choice(void)
 {
-    uint16_t port;
+    char port[8];
     printf("Enter a port: ");
-    scanf("%5hu", &port);
+    fgets(port, sizeof(port), stdin);
 
     int server_fd, new_socket;
     struct sockaddr_in address;
     int opt = 1;
     socklen_t addrlen = sizeof(address);
 
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((server_fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
         perror("Socket failed.");
         exit(EXIT_FAILURE);
     }
 
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
         perror("setsockopt failed.");
         exit(EXIT_FAILURE);
     }
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(port);
+    uint16_t port_int = atoi(port);
+    address.sin_port = htons(port_int);
 
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         perror("Bind failed.");
@@ -99,6 +92,11 @@ void handle_server_choice(void)
         if ((new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen))< 0) {
             perror("Accepting failed.");
             exit(EXIT_FAILURE);
+        } else {
+            char client_ip[INET_ADDRSTRLEN];
+            socklen_t addrlen = sizeof(addrlen);
+            inet_ntop(AF_INET, &address.sin_addr, client_ip, INET_ADDRSTRLEN);
+            printf("Client accepted from %s.\n", client_ip);
         }
     }
 }

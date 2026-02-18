@@ -6,7 +6,7 @@ BUILD_DIR = build
 
 TARGET = $(BUILD_DIR)/polycomm
 
-SRCS = polycomm.c polycomm.h cJSON/cJSON.c
+SRCS = polycomm.c polycomm.h cJSON/cJSON.c util.c util.h
 
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
