@@ -44,7 +44,7 @@ ssize_t recv_all(int fd, void *buffer, size_t len)
             total_received += n;
         }
         else if (n == 0) {
-            return -1;
+            return 0;
         }
         else {
             if (errno == EINTR)
@@ -107,6 +107,7 @@ void *client_manage(void *arg)
         }
 
     }
+
     return NULL;
 }
 
@@ -157,7 +158,7 @@ void handle_server_choice(void)
             printf("Client accepted from %s.\n", client_ip);
             pthread_t client_thread;
             int *cfd = (int *) malloc(sizeof(int));
-            cfd = &client_fd;
+            *cfd = client_fd;
             pthread_create(&client_thread, NULL, client_manage, cfd);
             pthread_detach(client_thread);
         }
@@ -209,8 +210,4 @@ void handle_client_choice(void)
     pthread_t chat_thread;
     pthread_create(&chat_thread, NULL, handle_chat, cfd);
     pthread_detach(chat_thread);
-
-    while(1) {
-        // handle receiving from server
-    }
 }
