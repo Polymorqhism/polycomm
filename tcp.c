@@ -12,6 +12,7 @@
 #include <errno.h>
 
 #define USER_MAXLEN 32
+#define MAX_CLIENTS 5000
 
 typedef struct {
     int fd;
@@ -20,20 +21,30 @@ typedef struct {
 } Client;
 
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-int clients = 0;
-int max_clients = 0;
+int client_n = 0;
+Client *clients[MAX_CLIENTS];
 
 
-void set_username(Client *client)
+void init_client(Client *client)
 {
     pthread_mutex_lock(&clients_mutex);
+
+    if (client_n >= MAX_CLIENTS) {
+        pthread_mutex_unlock(&clients_mutex);
+        return;
+    }
+
     client->username = malloc(USER_MAXLEN);
     if (!client->username) {
         pthread_mutex_unlock(&clients_mutex);
         return;
     }
-    snprintf(client->username, USER_MAXLEN, "user_%d", clients);
-    clients++;
+
+    snprintf(client->username, USER_MAXLEN, "user_%d", client_n);
+
+    clients[client_n] = client;
+    client_n++;
+
     pthread_mutex_unlock(&clients_mutex);
 }
 
@@ -92,6 +103,7 @@ static void *handle_chat(void *arg)
 
     while(1) {
         char buf[INPUT_MAX];
+        printf("> ");
         fgets(buf, INPUT_MAX-2, stdin);
         buf[strcspn(buf, "\n")] = 0;
         cJSON *message = cJSON_CreateObject();
@@ -114,15 +126,29 @@ static void *handle_chat(void *arg)
 
 void disconnect_client(Client *client)
 {
-    if(!client) {
-        return;
+    if (!client) return;
+
+    pthread_mutex_lock(&clients_mutex);
+
+    // some magic stuff with removing the element only god knows how this works
+    for (int i = 0; i < client_n; i++) {
+        if (clients[i] == client) {
+            clients[i] = clients[client_n - 1];
+            clients[client_n - 1] = NULL;
+            client_n--;
+            break;
+        }
     }
 
+    pthread_mutex_unlock(&clients_mutex);
+
     printf("Disconnecting client %s\n", client->username);
-    if(client->username) {
+
+    if (client->username) {
         free(client->username);
         client->username = NULL;
     }
+
     close(client->fd);
     free(client);
 }
@@ -143,7 +169,7 @@ void *client_manage(void *arg)
         uint32_t net_length = ntohl(net_length_u);
 
         if(net_length < 1048576) { // <--- thats one MB
-            char *json = (char *) malloc(net_length);
+            char *json = (char *) malloc(net_length+1);
             json[net_length] = '\0';
 
             if(recv_all(client_fd, json, net_length) == 0) {
@@ -160,8 +186,6 @@ void *client_manage(void *arg)
         } else {
             puts("Max limit (1 MB) per receive exceeded, rejecting.");
         }
-
-
     }
 
     return NULL;
@@ -172,11 +196,6 @@ void handle_server_choice(void)
     char port[8];
     printf("Enter a port: ");
     fgets(port, sizeof(port), stdin);
-
-    printf("Enter maximum number of users: ");
-    char max_cbuf[32];
-    fgets(max_cbuf, sizeof(max_cbuf), stdin);
-    max_clients = atoi(max_cbuf);
 
     int server_fd, client_fd;
     struct sockaddr_in address;
@@ -220,8 +239,9 @@ void handle_server_choice(void)
             Client *client = malloc(sizeof(Client));
             strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
             client->fd = client_fd;
-            set_username(client);
+            init_client(client);
             printf("Client accepted from %s with username %s.\n", client_ip, client->username);
+
 
             pthread_create(&client_thread, NULL, client_manage, client);
             pthread_detach(client_thread);
@@ -270,13 +290,12 @@ void handle_client_choice(void)
 
     Client *client = malloc(sizeof(Client));
     client->fd = client_fd;
-    set_username(client);
+    init_client(client);
 
     pthread_t chat_thread;
     pthread_create(&chat_thread, NULL, handle_chat, client);
     pthread_detach(chat_thread);
 
     while(1) {
-        // handle receiving from server
     }
 }

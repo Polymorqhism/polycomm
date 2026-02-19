@@ -28,7 +28,7 @@
 
 ## How?
 - polycomm, written in C, is a very simple system that uses TCP sockets to transmit messages with the help of cJSON.
-- There are two types of nodes: the server, and the client. Clients can connect to the server to communicate. The server handles the clients. The server also authenticates users based on a predetermined password automatically created by the server.
+- There are two types of nodes: the server, and the client. Clients can connect to the server to communicate. The server handles the clients. The server also authenticates users based on a predetermined password automatically created by the server*.
 - The design is kept intentionally simple to minimize the number of attack surfaces and points of collapse.
 - Encryption with libsodium is planned in the near future.
 
@@ -41,3 +41,4 @@
 ---
 Note: polycomm works entirely in the terminal. GUI support will never be added. Everything breaks if you apply enough pressure, polycomm is not an exception. Usage of this implies you understand there may be potential vulnerabilities which may not be known.
 - Users are welcome to fork this project to add customizations (such as GUI support, voice support, etc.). See license for more details.
+- *feature may not be working.
