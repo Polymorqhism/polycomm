@@ -1,0 +1,1 @@
+#define INPUT_MAX 1024

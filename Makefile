@@ -1,12 +1,12 @@
 CC = gcc
 
-CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON -lcurl
+CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON -lcurl -lpthread
 
 BUILD_DIR = build
 
 TARGET = $(BUILD_DIR)/polycomm
 
-SRCS = polycomm.c polycomm.h cJSON/cJSON.c util.c util.h
+SRCS = polycomm.c polycomm.h cJSON/cJSON.c util.c util.h tcp.c tcp.h
 
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
