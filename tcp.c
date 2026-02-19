@@ -210,4 +210,8 @@ void handle_client_choice(void)
     pthread_t chat_thread;
     pthread_create(&chat_thread, NULL, handle_chat, cfd);
     pthread_detach(chat_thread);
+
+    while(1) {
+        // handle receiving from server
+    }
 }
