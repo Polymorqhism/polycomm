@@ -6,6 +6,56 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include "polycomm.h"
+#include <sys/types.h>
+#include <errno.h>
+
+ssize_t send_all(int fd, const void *buffer, size_t len)
+{
+    size_t total_sent = 0;
+    const char *buf = buffer;
+
+    while (total_sent < len) {
+        ssize_t n = send(fd, buf + total_sent, len - total_sent, 0);
+
+        if (n > 0) {
+            total_sent += n;
+        } else if (n == 0) {
+            return -1;
+        } else {
+            if (errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+    }
+
+    return total_sent;
+}
+
+ssize_t recv_all(int fd, void *buffer, size_t len)
+{
+    size_t total_received = 0;
+    char *buf = buffer;
+
+    while (total_received < len) {
+        ssize_t n = recv(fd, buf + total_received, len - total_received, 0);
+
+        if (n > 0) {
+            total_received += n;
+        }
+        else if (n == 0) {
+            return -1;
+        }
+        else {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+    }
+
+    return total_received;
+}
 
 static void *handle_chat(void *arg)
 {
@@ -19,10 +69,13 @@ static void *handle_chat(void *arg)
         if(cJSON_AddStringToObject(message, "message", buf) == NULL) {
             return NULL;
         }
+
         char *pr = cJSON_PrintUnformatted(message);
 
-        printf("[%s]: %s", buf, pr);
-        send(client_fd, pr, strlen(pr), 0);
+        uint32_t length = strlen(pr);
+        uint32_t net_length = htonl(strlen(pr));
+        send_all(client_fd, &net_length, 4);
+        send_all(client_fd, pr, length);
 
         cJSON_free(pr);
         cJSON_Delete(message);
@@ -33,7 +86,27 @@ static void *handle_chat(void *arg)
 
 void *client_manage(void *arg)
 {
+    int client_fd = *(int *) arg;
+    while(1) {
+        uint32_t net_length_u;
+        recv_all(client_fd, &net_length_u, 4);
+        uint32_t net_length = ntohl(net_length_u);
 
+        if(net_length > 1048576) { // <--- thats one MB
+            puts("Max limit (1 MB) per receive exceeded, rejecting.");
+        } else {
+            char *json = (char *) malloc(net_length);
+
+            if(recv_all(client_fd, json, net_length) == 0) {
+                return NULL;
+            }
+
+            printf("%s\n", json);
+
+            free(json);
+        }
+
+    }
     return NULL;
 }
 
@@ -82,6 +155,11 @@ void handle_server_choice(void)
             socklen_t addrlen = sizeof(addrlen);
             inet_ntop(AF_INET, &address.sin_addr, client_ip, INET_ADDRSTRLEN);
             printf("Client accepted from %s.\n", client_ip);
+            pthread_t client_thread;
+            int *cfd = (int *) malloc(sizeof(int));
+            cfd = &client_fd;
+            pthread_create(&client_thread, NULL, client_manage, cfd);
+            pthread_detach(client_thread);
         }
     }
 }
