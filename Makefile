@@ -1,20 +1,20 @@
 CC = gcc
 
-CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON -lcurl -lpthread
+CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON
+LDLIBS = -lcurl -lpthread
 
 BUILD_DIR = build
 
 TARGET = $(BUILD_DIR)/polycomm
 
-SRCS = polycomm.c polycomm.h cJSON/cJSON.c util.c util.h tcp.c tcp.h
-
+SRCS = polycomm.c cJSON/cJSON.c util.c tcp.c
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -23,7 +23,7 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	rm -rf $(BUILD_DIR)
 
-run:
-	build/polycomm
+run: $(TARGET)
+	./$(TARGET)
 
 .PHONY: all clean run
