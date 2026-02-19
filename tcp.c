@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <ncurses.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include "polycomm.h"
 #include <sys/types.h>
 #include <assert.h>
+#include "util.h"
 #include <errno.h>
 
 #define USER_MAXLEN 32
@@ -102,10 +104,16 @@ static void *handle_chat(void *arg)
     int client_fd = client.fd;
 
     while(1) {
+        init_ncurses();
+
         char buf[INPUT_MAX];
-        printf("> ");
-        fgets(buf, INPUT_MAX-2, stdin);
-        buf[strcspn(buf, "\n")] = 0;
+        werase(input_win);
+        mvwprintw(input_win, 0, 0, "> ");
+        wrefresh(input_win);
+
+        wgetnstr(input_win, buf, INPUT_MAX - 1);
+        wrefresh(output_win);
+
         cJSON *message = cJSON_CreateObject();
         if(cJSON_AddStringToObject(message, "message", buf) == NULL) {
             return NULL;

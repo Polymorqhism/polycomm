@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ncurses.h>
 #include "polycomm.h"
 
 const char banner[188] =    "┌─┐┌─┐┬ ┬ ┬┌─┐┌─┐┌┬┐┌┬┐\n"
@@ -23,4 +24,28 @@ void display_banner(void)
 {
     printf("\033[2J");
     printf("%s\n\n", banner);
+}
+
+
+WINDOW *output_win;
+WINDOW *input_win;
+
+void init_ncurses(void)
+{
+
+        initscr();
+        cbreak();
+        keypad(stdscr, TRUE);
+
+        int rows, cols;
+        getmaxyx(stdscr, rows, cols);
+
+        output_win = newwin(rows - 1, cols, 0, 0);
+        input_win  = newwin(1, cols, rows - 1, 0);
+
+        scrollok(output_win, TRUE);
+        wmove(input_win, 0, 0);
+        wrefresh(input_win);
+        wrefresh(output_win);
+
 }
