@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <string.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "cJSON/cJSON.h"
@@ -7,7 +8,34 @@
 #include <sys/socket.h>
 #include "polycomm.h"
 #include <sys/types.h>
+#include <assert.h>
 #include <errno.h>
+
+#define USER_MAXLEN 32
+
+typedef struct {
+    int fd;
+    char ip[INET_ADDRSTRLEN];
+    char *username;
+} Client;
+
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+int clients = 0;
+int max_clients = 0;
+
+
+void set_username(Client *client)
+{
+    pthread_mutex_lock(&clients_mutex);
+    client->username = malloc(USER_MAXLEN);
+    if (!client->username) {
+        pthread_mutex_unlock(&clients_mutex);
+        return;
+    }
+    snprintf(client->username, USER_MAXLEN, "user_%d", clients);
+    clients++;
+    pthread_mutex_unlock(&clients_mutex);
+}
 
 ssize_t send_all(int fd, const void *buffer, size_t len)
 {
@@ -59,7 +87,8 @@ ssize_t recv_all(int fd, void *buffer, size_t len)
 
 static void *handle_chat(void *arg)
 {
-    int client_fd = *(int *)arg;
+    Client client = *(Client *) arg;
+    int client_fd = client.fd;
 
     while(1) {
         char buf[INPUT_MAX];
@@ -83,28 +112,55 @@ static void *handle_chat(void *arg)
     return NULL;
 }
 
+void disconnect_client(Client *client)
+{
+    if(!client) {
+        return;
+    }
+
+    printf("Disconnecting client %s\n", client->username);
+    if(client->username) {
+        free(client->username);
+        client->username = NULL;
+    }
+    close(client->fd);
+    free(client);
+}
 
 void *client_manage(void *arg)
 {
-    int client_fd = *(int *) arg;
+    Client *client = (Client *) arg;
+    int client_fd = client->fd;
+
     while(1) {
         uint32_t net_length_u;
-        recv_all(client_fd, &net_length_u, 4);
+        ssize_t n = recv_all(client_fd, &net_length_u, 4);
+        if(n <= 0) { // n == 0 can ONLY mean disconnect for some reason??
+            disconnect_client(client);
+            return NULL;
+        }
+
         uint32_t net_length = ntohl(net_length_u);
 
-        if(net_length > 1048576) { // <--- thats one MB
-            puts("Max limit (1 MB) per receive exceeded, rejecting.");
-        } else {
+        if(net_length < 1048576) { // <--- thats one MB
             char *json = (char *) malloc(net_length);
+            json[net_length] = '\0';
 
             if(recv_all(client_fd, json, net_length) == 0) {
+                disconnect_client(client);
                 return NULL;
             }
 
-            printf("%s\n", json);
+            cJSON *parsed_json = cJSON_Parse(json);
+            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+
+            printf("%s: %s\n", client->username, message->valuestring);
 
             free(json);
+        } else {
+            puts("Max limit (1 MB) per receive exceeded, rejecting.");
         }
+
 
     }
 
@@ -116,6 +172,11 @@ void handle_server_choice(void)
     char port[8];
     printf("Enter a port: ");
     fgets(port, sizeof(port), stdin);
+
+    printf("Enter maximum number of users: ");
+    char max_cbuf[32];
+    fgets(max_cbuf, sizeof(max_cbuf), stdin);
+    max_clients = atoi(max_cbuf);
 
     int server_fd, client_fd;
     struct sockaddr_in address;
@@ -155,11 +216,14 @@ void handle_server_choice(void)
             char client_ip[INET_ADDRSTRLEN];
             socklen_t addrlen = sizeof(addrlen);
             inet_ntop(AF_INET, &address.sin_addr, client_ip, INET_ADDRSTRLEN);
-            printf("Client accepted from %s.\n", client_ip);
             pthread_t client_thread;
-            int *cfd = (int *) malloc(sizeof(int));
-            *cfd = client_fd;
-            pthread_create(&client_thread, NULL, client_manage, cfd);
+            Client *client = malloc(sizeof(Client));
+            strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
+            client->fd = client_fd;
+            set_username(client);
+            printf("Client accepted from %s with username %s.\n", client_ip, client->username);
+
+            pthread_create(&client_thread, NULL, client_manage, client);
             pthread_detach(client_thread);
         }
     }
@@ -204,11 +268,12 @@ void handle_client_choice(void)
     puts("Connection successful.");
     printf("\033[2J");
 
-    int *cfd = (int *) malloc(sizeof(int));
-    cfd = &client_fd;
+    Client *client = malloc(sizeof(Client));
+    client->fd = client_fd;
+    set_username(client);
 
     pthread_t chat_thread;
-    pthread_create(&chat_thread, NULL, handle_chat, cfd);
+    pthread_create(&chat_thread, NULL, handle_chat, client);
     pthread_detach(chat_thread);
 
     while(1) {
