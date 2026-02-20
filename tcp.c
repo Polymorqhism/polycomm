@@ -25,7 +25,7 @@ typedef struct {
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int client_n = 0;
 Client *clients[MAX_CLIENTS];
-
+int username_id = 0;
 
 void init_client(Client *client)
 {
@@ -42,10 +42,11 @@ void init_client(Client *client)
         return;
     }
 
-    snprintf(client->username, USER_MAXLEN, "user_%d", client_n);
+    snprintf(client->username, USER_MAXLEN, "user_%d", username_id);
 
     clients[client_n] = client;
     client_n++;
+    username_id++;
 
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -100,11 +101,11 @@ ssize_t recv_all(int fd, void *buffer, size_t len)
 
 static void broadcast_clients(void *buf, size_t len)
 {
+    pthread_mutex_lock(&clients_mutex);
     for(int i = 0; i<client_n; i++) {
-        pthread_mutex_lock(&clients_mutex);
         send_all(clients[i]->fd, buf, len);
-        pthread_mutex_unlock(&clients_mutex);
     }
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 static void *handle_chat(void *arg)
@@ -112,7 +113,6 @@ static void *handle_chat(void *arg)
     Client client = *(Client *) arg;
     int client_fd = client.fd;
 
-    init_ncurses();
     while(1) {
         char buf[INPUT_MAX];
         werase(input_win);
@@ -121,6 +121,10 @@ static void *handle_chat(void *arg)
 
         wgetnstr(input_win, buf, INPUT_MAX - 1);
         wrefresh(output_win);
+
+        if(buf[0] == '\0') {
+            continue;
+        }
 
         cJSON *message = cJSON_CreateObject();
         if(cJSON_AddStringToObject(message, "message", buf) == NULL) {
@@ -195,8 +199,10 @@ void *client_manage(void *arg)
 
             cJSON *parsed_json = cJSON_Parse(json);
             if(parsed_json) {
-
                 cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+                if(strcmp(message->valuestring, "") == 0 || !message) {
+                    continue;
+                }
                 cJSON_AddStringToObject(parsed_json, "author", client->username);
 
                 char *pr_j = cJSON_PrintUnformatted(parsed_json);
@@ -268,6 +274,17 @@ void handle_server_choice(void)
             init_client(client);
             printf("Client accepted from %s with username %s.\n", client_ip, client->username);
 
+            cJSON *joined = cJSON_CreateObject();
+            char join_msg[64];
+            snprintf(join_msg, sizeof(join_msg), "%s joined", client->username);
+            cJSON_AddStringToObject(joined, "message", join_msg);
+            cJSON_AddStringToObject(joined, "author", "[SERVER]");
+            char *pr = cJSON_PrintUnformatted(joined);
+
+            uint32_t length = strlen(pr);
+            uint32_t net_length = htonl(strlen(pr));
+            broadcast_clients(&net_length, 4);
+            broadcast_clients(pr, length);
 
             pthread_create(&client_thread, NULL, client_manage, client);
             pthread_detach(client_thread);
@@ -322,8 +339,11 @@ void handle_client_choice(void)
     pthread_create(&chat_thread, NULL, handle_chat, client);
     pthread_detach(chat_thread);
 
+    init_ncurses();
+    start_color();
+    use_default_colors();
+    init_pair(1, COLOR_CYAN, -1);
     while(1) {
-        // handling what server gives here:
         uint32_t net_length_u;
         recv_all(client_fd, &net_length_u, 4);
 
@@ -346,6 +366,13 @@ void handle_client_choice(void)
             cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
             cJSON *author = cJSON_GetObjectItemCaseSensitive(parsed_json, "author");
             if((message && author) && (cJSON_IsString(message) && cJSON_IsString(author))) {
+                if(strcmp(author->valuestring, "[SERVER]") == 0) {
+                    wattron(output_win, COLOR_PAIR(1));
+                    wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
+                    wattroff(output_win, COLOR_PAIR(1));
+                    wrefresh(output_win);
+                    continue;
+                }
                 wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
                 wrefresh(output_win);
             }

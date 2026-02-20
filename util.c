@@ -32,10 +32,15 @@ WINDOW *input_win;
 
 void init_ncurses(void)
 {
-
         initscr();
         cbreak();
         keypad(stdscr, TRUE);
+
+        if (has_colors()) {
+            start_color();
+            use_default_colors();
+            init_pair(1, COLOR_CYAN, -1);
+        }
 
         int rows, cols;
         getmaxyx(stdscr, rows, cols);
