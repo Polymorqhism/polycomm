@@ -202,7 +202,7 @@ void *client_manage(void *arg)
             cJSON *parsed_json = cJSON_Parse(json);
             if(parsed_json) {
                 cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
-                if(strcmp(message->valuestring, "") == 0 || !message) {
+                if(!message || strcmp(message->valuestring, "") == 0) {
                     continue;
                 }
                 cJSON_AddStringToObject(parsed_json, "author", client->username);
@@ -331,13 +331,6 @@ void handle_client_choice(void)
     }
 
     freeaddrinfo(res);
-
-    if(connect(client_fd, res->ai_addr, res->ai_addrlen) < 0) {
-        perror("Failed to connect.");
-        return;
-    }
-
-    puts("Connection successful.");
     printf("\033[2J");
 
     Client *client = malloc(sizeof(Client));
