@@ -34,7 +34,7 @@
 
 ## polycomm is not:
 - An anonymous platform by default. All data is linked to your IP.
-- A large-scale platform.
+- A large-scale platform - server performance degrades after 5K users.
 - Aiming for mass-use.
 - Plug and play.
 
