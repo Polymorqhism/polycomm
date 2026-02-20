@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <netdb.h>
 #include <ncurses.h>
 #include <string.h>
 #include <unistd.h>
@@ -307,23 +308,30 @@ void handle_client_choice(void)
     printf("\nIP set as %s and port as %s.\n", ip, port);
 
     int client_fd;
-    struct sockaddr_in server_addr;
     if((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket creation error.");
         return;
     }
+    struct addrinfo hints, *res;
 
-    server_addr.sin_family = AF_INET;
-    uint16_t port_int = atoi(port);
-    server_addr.sin_port = htons(port_int);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
 
-    if(inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-        perror("Bad IP.");
+    if (getaddrinfo(ip, port, &hints, &res) != 0) {
+        perror("getaddrinfo");
         return;
     }
 
+    if (connect(client_fd, res->ai_addr, res->ai_addrlen) < 0) {
+        perror("Failed to connect.");
+        freeaddrinfo(res);
+        return;
+    }
 
-    if(connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    freeaddrinfo(res);
+
+    if(connect(client_fd, res->ai_addr, res->ai_addrlen) < 0) {
         perror("Failed to connect.");
         return;
     }
