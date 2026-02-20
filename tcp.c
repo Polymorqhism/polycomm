@@ -98,14 +98,22 @@ ssize_t recv_all(int fd, void *buffer, size_t len)
     return total_received;
 }
 
+static void broadcast_clients(void *buf, size_t len)
+{
+    for(int i = 0; i<client_n; i++) {
+        pthread_mutex_lock(&clients_mutex);
+        send_all(clients[i]->fd, buf, len);
+        pthread_mutex_unlock(&clients_mutex);
+    }
+}
+
 static void *handle_chat(void *arg)
 {
     Client client = *(Client *) arg;
     int client_fd = client.fd;
 
+    init_ncurses();
     while(1) {
-        init_ncurses();
-
         char buf[INPUT_MAX];
         werase(input_win);
         mvwprintw(input_win, 0, 0, "> ");
@@ -187,8 +195,15 @@ void *client_manage(void *arg)
 
             cJSON *parsed_json = cJSON_Parse(json);
             cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+            cJSON_AddStringToObject(parsed_json, "author", client->username);
 
+            char *pr_j = cJSON_PrintUnformatted(parsed_json);
             printf("%s: %s\n", client->username, message->valuestring);
+
+            uint32_t length = strlen(pr_j);
+            uint32_t net_length_j = htonl(strlen(pr_j));
+            broadcast_clients(&net_length_j, 4);
+            broadcast_clients(pr_j, length);
 
             free(json);
         } else {
@@ -305,5 +320,32 @@ void handle_client_choice(void)
     pthread_detach(chat_thread);
 
     while(1) {
+        // handling what server gives here:
+        uint32_t net_length_u;
+        recv_all(client_fd, &net_length_u, 4);
+
+        uint32_t net_length = ntohl(net_length_u);
+
+        char *json = (char *) malloc(net_length+1);
+        if(!json) {
+            puts("Malloc failed.");
+            return;
+        }
+
+        json[net_length] = '\0';
+        size_t n = recv_all(client_fd, json, net_length);
+        if(n > 0) {
+            cJSON *parsed_json = cJSON_Parse(json);
+            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+            cJSON *author = cJSON_GetObjectItemCaseSensitive(parsed_json, "author");
+            wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
+            wrefresh(output_win);
+
+            cJSON_Delete(parsed_json);
+            free(json);
+        } else if(n == 0) {
+            close(client_fd);
+        }
     }
+    endwin();
 }
