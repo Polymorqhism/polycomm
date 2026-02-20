@@ -194,17 +194,20 @@ void *client_manage(void *arg)
             }
 
             cJSON *parsed_json = cJSON_Parse(json);
-            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
-            cJSON_AddStringToObject(parsed_json, "author", client->username);
+            if(parsed_json) {
 
-            char *pr_j = cJSON_PrintUnformatted(parsed_json);
-            printf("%s: %s\n", client->username, message->valuestring);
+                cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+                cJSON_AddStringToObject(parsed_json, "author", client->username);
 
-            uint32_t length = strlen(pr_j);
-            uint32_t net_length_j = htonl(strlen(pr_j));
-            broadcast_clients(&net_length_j, 4);
-            broadcast_clients(pr_j, length);
+                char *pr_j = cJSON_PrintUnformatted(parsed_json);
+                printf("%s: %s\n", client->username, message->valuestring);
 
+                uint32_t length = strlen(pr_j);
+                uint32_t net_length_j = htonl(strlen(pr_j));
+                broadcast_clients(&net_length_j, 4);
+                broadcast_clients(pr_j, length);
+            }
+            cJSON_Delete(parsed_json);
             free(json);
         } else {
             puts("Max limit (1 MB) per receive exceeded, rejecting.");
@@ -336,10 +339,16 @@ void handle_client_choice(void)
         size_t n = recv_all(client_fd, json, net_length);
         if(n > 0) {
             cJSON *parsed_json = cJSON_Parse(json);
+            if(!parsed_json) {
+                continue;
+            }
+
             cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
             cJSON *author = cJSON_GetObjectItemCaseSensitive(parsed_json, "author");
-            wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
-            wrefresh(output_win);
+            if((message && author) && (cJSON_IsString(message) && cJSON_IsString(author))) {
+                wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
+                wrefresh(output_win);
+            }
 
             cJSON_Delete(parsed_json);
             free(json);
