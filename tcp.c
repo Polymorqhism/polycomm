@@ -301,7 +301,7 @@ void *client_manage(void *arg)
                         found = 1;
                     }
                 }
-                pthread_mutex_lock(&clients_mutex);
+                pthread_mutex_unlock(&clients_mutex);
                 if(found == 1) {
                     continue;
                 }
