@@ -16,6 +16,8 @@
 #include "network.h"
 #include "client.h"
 
+#define MAX_SAME_CLIENTS 5
+
 static void broadcast_clients(void *buf, size_t len)
 {
     pthread_mutex_lock(&clients_mutex);
@@ -167,6 +169,25 @@ void *client_manage(void *arg)
     return NULL;
 }
 
+static int is_client_abusive(char *ip)
+{
+    int abusive = 0;
+    int ip_counter = 0;
+    pthread_mutex_lock(&clients_mutex);
+    for(int i = 0; i<client_n; i++) {
+        if(ip_counter == MAX_SAME_CLIENTS) {
+            abusive = 1;
+            break;
+        }
+        if(strcmp(clients[i]->ip, ip) == 0) {
+            ip_counter++;
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+
+    return abusive;
+}
+
 void handle_server_choice(void)
 {
     char port[8];
@@ -176,7 +197,6 @@ void handle_server_choice(void)
     int server_fd, client_fd;
     struct sockaddr_in address;
     int opt = 1;
-    socklen_t addrlen = sizeof(address);
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket failed.");
@@ -204,37 +224,43 @@ void handle_server_choice(void)
     }
 
     while(1) {
-        if ((client_fd = accept(server_fd, (struct sockaddr*)&address, &addrlen))< 0) {
+        struct sockaddr_in client_addr;
+        socklen_t client_addrlen = sizeof(client_addr);
+        client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_addrlen);
+        if(client_fd < 0) {
             perror("Accepting failed.");
             exit(EXIT_FAILURE);
-        } else {
-            char client_ip[INET_ADDRSTRLEN];
-            socklen_t addrlen = sizeof(addrlen);
-            inet_ntop(AF_INET, &address.sin_addr, client_ip, INET_ADDRSTRLEN);
-            pthread_t client_thread;
-            Client *client = malloc(sizeof(Client));
-            strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
-            client->fd = client_fd;
-            init_client(client);
-            printf("Client accepted from %s with username %s.\n", client_ip, client->username);
+        }
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+        pthread_t client_thread;
+        Client *client = malloc(sizeof(Client));
+        strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
+        client->fd = client_fd;
+        init_client(client);
+        if(is_client_abusive(client_ip)) {
+            disconnect_client(client);
+            continue;
+        }
 
-            cJSON *joined = cJSON_CreateObject();
-            char join_msg[64];
-            snprintf(join_msg, sizeof(join_msg), "%s joined", client->username);
-            cJSON_AddStringToObject(joined, "message", join_msg);
-            cJSON_AddStringToObject(joined, "author", "[SERVER]");
-            char *pr = cJSON_PrintUnformatted(joined);
+        printf("Client accepted from %s with username %s.\n", client_ip, client->username);
 
-            uint32_t length = strlen(pr);
-            uint32_t net_length = htonl(strlen(pr));
-            broadcast_clients(&net_length, 4);
-            broadcast_clients(pr, length);
+        cJSON *joined = cJSON_CreateObject();
+        char join_msg[64];
+        snprintf(join_msg, sizeof(join_msg), "%s joined", client->username);
+        cJSON_AddStringToObject(joined, "message", join_msg);
+        cJSON_AddStringToObject(joined, "author", "[SERVER]");
+        char *pr = cJSON_PrintUnformatted(joined);
 
-            pthread_create(&client_thread, NULL, client_manage, client);
-            pthread_detach(client_thread);
-            if(pr) {
-                free(pr);
-            }
+        uint32_t length = strlen(pr);
+        uint32_t net_length = htonl(strlen(pr));
+        broadcast_clients(&net_length, 4);
+        broadcast_clients(pr, length);
+
+        pthread_create(&client_thread, NULL, client_manage, client);
+        pthread_detach(client_thread);
+        if(pr) {
+            free(pr);
         }
     }
 }
