@@ -62,6 +62,10 @@ static void handle_command(char *input, Client *client)
         if(pr) free(pr);
 
         // this sends a request to the server to change the username
+    } else if(strcmp(args[0], "!leave") == 0) {
+        close(client->fd);
+        endwin();
+        exit(0);
     }
 }
 
