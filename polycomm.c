@@ -48,11 +48,14 @@ int check_updates()
     if(!f) return 2;
     fgets(local_version, sizeof(local_version), f);
     fclose(f);
-    local_version[strcspn(local_version, "\n")] = '\0';
-
+    local_version[strcspn(local_version, "\r\n")] = '\0';
+    buf.data[strcspn(buf.data, "\r\n")] = '\0';
     if(strcmp(local_version, buf.data) != 0) {
         needs_update = 1;
     }
+
+    printf("Current: '%s'\n", local_version);
+    printf("Best: '%s'\n", buf.data);
     curl_easy_cleanup(curl);
     return needs_update;
 }
