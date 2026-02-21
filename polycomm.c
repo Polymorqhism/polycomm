@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "polycomm.h"
-#include "tcp.h"
+#include "client.h"
+#include "server.h"
 #include "util.h"
 #include <signal.h>
 

@@ -7,7 +7,7 @@ BUILD_DIR = build
 
 TARGET = $(BUILD_DIR)/polycomm
 
-SRCS = polycomm.c cJSON/cJSON.c util.c tcp.c
+SRCS = polycomm.c cJSON/cJSON.c util.c server.c network.c client.c
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
 all: $(TARGET)
