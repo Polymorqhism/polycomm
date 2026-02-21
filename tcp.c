@@ -293,6 +293,19 @@ void *client_manage(void *arg)
                     continue;
                 }
 
+                int found = 0;
+
+                pthread_mutex_lock(&clients_mutex);
+                for(int i = 0; i<client_n; i++) {
+                    if(strcmp(clients[i]->username, username->valuestring) == 0) {
+                        found = 1;
+                    }
+                }
+                pthread_mutex_lock(&clients_mutex);
+                if(found == 1) {
+                    continue;
+                }
+
                 cJSON *changed = cJSON_CreateObject();
                 char change_msg[128];
                 snprintf(change_msg, sizeof(change_msg), "%s changed their username to %s", client->username, username->valuestring);
