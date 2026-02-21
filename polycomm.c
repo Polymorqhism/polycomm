@@ -2,9 +2,11 @@
 #include "polycomm.h"
 #include "tcp.h"
 #include "util.h"
+#include <signal.h>
 
 int main(void)
 {
+    signal(SIGPIPE, SIG_IGN);
     display_banner();
 
     int choice = get_choice();

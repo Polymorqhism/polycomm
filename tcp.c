@@ -110,6 +110,46 @@ static void broadcast_clients(void *buf, size_t len)
     pthread_mutex_unlock(&clients_mutex);
 }
 
+static void handle_command(char *input, Client *client)
+{
+    char *args[6];
+    int argn = 0;
+    char input_copy[INPUT_MAX];
+    strncpy(input_copy, input, INPUT_MAX);
+
+    char *token = strtok(input_copy, " ");
+    while(token != NULL && argn < 6) {
+        args[argn++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    if(argn == 0) return;
+    if(strcmp(args[0], "!changeusername") == 0) {
+        if(argn < 2) {
+            return;
+        }
+        cJSON *json = cJSON_CreateObject();
+        if(!json) {
+            return;
+        }
+
+        cJSON_AddStringToObject(json, "request", "username");
+        cJSON_AddStringToObject(json, "target", args[1]);
+
+        char *pr = cJSON_PrintUnformatted(json);
+        if(!pr) return;
+        uint32_t length = strlen(pr);
+        uint32_t net_length = htonl(length);
+        send_all(client->fd, &net_length, 4);
+        send_all(client->fd, pr, length);
+
+        cJSON_Delete(json);
+        if(pr) free(pr);
+
+        // this sends a request to the server to change the username
+    }
+}
+
 static void *handle_chat(void *arg)
 {
     Client client = *(Client *) arg;
@@ -125,6 +165,11 @@ static void *handle_chat(void *arg)
         wrefresh(output_win);
 
         if(buf[0] == '\0') {
+            continue;
+        }
+
+        if(buf[0] == '!') {
+            handle_command(buf, &client);
             continue;
         }
 
@@ -166,6 +211,19 @@ void disconnect_client(Client *client)
 
     printf("Disconnecting client %s\n", client->username);
 
+    cJSON *left = cJSON_CreateObject();
+    char left_msg[64];
+    snprintf(left_msg, sizeof(left_msg), "%s left", client->username);
+    cJSON_AddStringToObject(left, "message", left_msg);
+    cJSON_AddStringToObject(left, "author", "[SERVER]");
+    char *pr = cJSON_PrintUnformatted(left);
+
+    uint32_t length = strlen(pr);
+    uint32_t net_length = htonl(strlen(pr));
+    broadcast_clients(&net_length, 4);
+    broadcast_clients(pr, length);
+
+
     if (client->username) {
         free(client->username);
         client->username = NULL;
@@ -173,6 +231,10 @@ void disconnect_client(Client *client)
 
     close(client->fd);
     free(client);
+    if(pr) {
+        free(pr);
+    }
+    cJSON_Delete(left);
 }
 
 void *client_manage(void *arg)
@@ -192,6 +254,7 @@ void *client_manage(void *arg)
 
         if(net_length < 1048576) { // <--- thats one MB
             char *json = (char *) malloc(net_length+1);
+            if(!json) continue;
             json[net_length] = '\0';
 
             if(recv_all(client_fd, json, net_length) == 0) {
@@ -200,11 +263,14 @@ void *client_manage(void *arg)
             }
 
             cJSON *parsed_json = cJSON_Parse(json);
-            if(parsed_json) {
-                cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
-                if(!message || strcmp(message->valuestring, "") == 0) {
-                    continue;
-                }
+            if(!parsed_json) {
+                free(json);
+                continue;
+            }
+
+            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+            cJSON *request = cJSON_GetObjectItemCaseSensitive(parsed_json, "request");
+            if(message && strcmp(message->valuestring, "")) {
                 cJSON_AddStringToObject(parsed_json, "author", client->username);
 
                 char *pr_j = cJSON_PrintUnformatted(parsed_json);
@@ -214,6 +280,35 @@ void *client_manage(void *arg)
                 uint32_t net_length_j = htonl(strlen(pr_j));
                 broadcast_clients(&net_length_j, 4);
                 broadcast_clients(pr_j, length);
+                if(pr_j) {
+                    free(pr_j);
+                }
+            } else if(request && strcmp(request->valuestring, "")) {
+                cJSON *username = cJSON_GetObjectItemCaseSensitive(parsed_json, "target");
+                if(!username) {
+                    if(json) {
+                        free(json);
+                        cJSON_Delete(parsed_json);
+                    }
+                    continue;
+                }
+
+                cJSON *changed = cJSON_CreateObject();
+                char change_msg[128];
+                snprintf(change_msg, sizeof(change_msg), "%s changed their username to %s", client->username, username->valuestring);
+                cJSON_AddStringToObject(changed, "message", change_msg);
+                cJSON_AddStringToObject(changed, "author", "[SERVER]");
+                char *pr = cJSON_PrintUnformatted(changed);
+
+                uint32_t length = strlen(pr);
+                uint32_t net_length = htonl(strlen(pr));
+                broadcast_clients(&net_length, 4);
+                broadcast_clients(pr, length);
+
+                if(pr) free(pr);
+                cJSON_Delete(changed);
+                free(client->username);
+                client->username = strdup(username->valuestring);
             }
             cJSON_Delete(parsed_json);
             free(json);
@@ -290,6 +385,9 @@ void handle_server_choice(void)
 
             pthread_create(&client_thread, NULL, client_manage, client);
             pthread_detach(client_thread);
+            if(pr) {
+                free(pr);
+            }
         }
     }
 }
@@ -309,10 +407,6 @@ void handle_client_choice(void)
     printf("\nIP set as %s and port as %s.\n", ip, port);
 
     int client_fd;
-    if((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("Socket creation error.");
-        return;
-    }
     struct addrinfo hints, *res;
 
     memset(&hints, 0, sizeof(hints));
@@ -324,6 +418,10 @@ void handle_client_choice(void)
         return;
     }
 
+    if((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation error.");
+        return;
+    }
     if (connect(client_fd, res->ai_addr, res->ai_addrlen) < 0) {
         perror("Failed to connect.");
         freeaddrinfo(res);
