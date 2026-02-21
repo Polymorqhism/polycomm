@@ -21,24 +21,25 @@
 > This is unfinished and NOT production ready. Clients and servers may see your public IP.
 ---
 
-## Why?
-- Ever since most platforms started pushing ID verification for communication, privacy has become a luxury.
-- polycomm works by leaving moderation entirely in the hands of the users in self-hosted manner.
-- This solves the problem of having a larger organization viewing everything you do.
-
 ## How?
 - polycomm, written in C, is a very simple system that uses TCP sockets to transmit messages with the help of cJSON.
 - There are two types of nodes: the server, and the client. Clients can connect to the server to communicate. The server handles the clients. The server also authenticates users based on a predetermined password automatically created by the server*.
 - The design is kept intentionally simple to minimize the number of attack surfaces and points of collapse.
-- Encryption with libsodium is planned in the near future.
+- Full libsodium implementation for encryption is planned in the near future.
+
+## Why?
+- polycomm aims to allow users to communicate with minimal overarching organizational surveillance.
 
 ## polycomm is not:
-- An anonymous platform by default. All data is linked to your IP.
-- A large-scale platform - server performance degrades after 5K users.
-- Aiming for mass-use.
-- Plug and play.
+- An anonymous platform by default. All data is linked to your IP,
+- a large-scale platform - server performance degrades after 5K users,
+- aiming for mass-use,
+- plug and play,
+- 100% safe or secure.
 
----
-Note: polycomm works entirely in the terminal. GUI support will never be added. Everything breaks if you apply enough pressure, polycomm is not an exception. Usage of this implies you understand there may be potential vulnerabilities which may not be known.
-- Users are welcome to fork this project to add customizations (such as GUI support, voice support, etc.). See license for more details.
-- *feature may not be working.
+## More Info:
+- Any changes in users' local versions will get flagged and prompt user acknowledgement before usage.
+  - In earlier stages, this may occur more frequently to prevent vulnerabilities from affecting users' systems. It is in best interest to update as soon as possible BEFORE using polycomm.
+- A GUI version of polycomm is *NOT* officially endorsed. Use them with caution.
+- Users must be implicitly aware that polycomm is under development and should never be used for any matter which may concern security in the slightest until v1.0.0 is released.
+- View the current version [here](version.txt).
