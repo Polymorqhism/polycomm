@@ -161,6 +161,7 @@ void handle_client_choice(void)
     }
 
     if((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        freeaddrinfo(res);
         perror("Socket creation error.");
         return;
     }
@@ -212,6 +213,7 @@ void handle_client_choice(void)
         if(n > 0) {
             cJSON *parsed_json = cJSON_Parse(json);
             if(!parsed_json) {
+                free(json);
                 continue;
             }
 
@@ -223,6 +225,8 @@ void handle_client_choice(void)
                     wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
                     wattroff(output_win, COLOR_PAIR(1));
                     wrefresh(output_win);
+                    cJSON_Delete(parsed_json);
+                    free(json);
                     continue;
                 }
                 wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
