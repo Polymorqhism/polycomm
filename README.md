@@ -18,7 +18,7 @@
 > You must host your own servers.
 
 > [!CAUTION]
-> This is unfinished and NOT production ready. Clients and servers may see your public IP.
+> This is unfinished and NOT production ready. Servers may see your public IP. Do not delete the `known_servers.json` file if you wish to keep MiTM protection against servers you've already connected to.
 ---
 
 ## How?
