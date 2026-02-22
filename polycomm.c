@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sodium.h>
 #include <string.h>
 #include "polycomm.h"
 #include "client.h"
@@ -62,6 +63,7 @@ int check_updates()
 
 int main(void)
 {
+
     int needs_update = check_updates();
     if(needs_update == 1) { // better to be explicit than rely on (x) == 1 being always true :broken_heart:
         puts("WARNING: Your version of polycomm is not correct. To ensure that your use of this program is safe, please consider updating.\n\nIf you wish to continue despite these risks, click ENTER.");
@@ -72,6 +74,12 @@ int main(void)
         int c;
         while ((c = getchar()) != '\n' && c != EOF);
     }
+
+    if(sodium_init() == -1) {
+        puts("Failed to init sodium, cannot continue.");
+        return 1;
+    }
+
     signal(SIGPIPE, SIG_IGN);
     display_banner();
 

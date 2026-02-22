@@ -243,6 +243,11 @@ void handle_server_choice(void)
             continue;
         }
 
+        if(handshake_server(client->fd) == -1) {
+            disconnect_client(client);
+            continue;
+        }
+
         printf("Client accepted from %s with username %s.\n", client_ip, client->username);
 
         cJSON *joined = cJSON_CreateObject();

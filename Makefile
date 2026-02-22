@@ -1,7 +1,7 @@
 CC = gcc
 
 CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON
-LDLIBS = -lcurl -lpthread -lncurses
+LDLIBS = -lcurl -lpthread -lncurses -lsodium
 
 BUILD_DIR = build
 

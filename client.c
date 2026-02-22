@@ -170,6 +170,10 @@ void handle_client_choice(void)
         return;
     }
 
+    if(handshake_client(client_fd) == -1) {
+        return;
+    }
+
     freeaddrinfo(res);
     printf("\033[2J");
 
