@@ -174,8 +174,9 @@ void handle_client_choice(void)
     client->fd = client_fd;
     init_client(client);
 
-
-    if(handshake_client(client_fd, &client->tx_state, &client->rx_state) == -1) {
+    if(handshake_client(client_fd, &client->tx_state, &client->rx_state, ip) == -1) {
+        freeaddrinfo(res);
+        free(client->username);
         free(client);
         return;
     }
