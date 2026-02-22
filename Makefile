@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON
+CFLAGS = -Wall -Wextra -std=c11 -O2 -IcJSON -fsanitize=address
 LDLIBS = -lcurl -lpthread -lncurses -lsodium
 
 BUILD_DIR = build

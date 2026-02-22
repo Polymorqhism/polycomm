@@ -22,7 +22,7 @@ static void broadcast_clients(void *buf, size_t len)
 {
     pthread_mutex_lock(&clients_mutex);
     for(int i = 0; i<client_n; i++) {
-        send_all(clients[i]->fd, buf, len);
+        send_all(clients[i]->fd, buf, len, &clients[i]->tx_state);
     }
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -80,7 +80,7 @@ void *client_manage(void *arg)
 
     while(1) {
         uint32_t net_length_u;
-        ssize_t n = recv_all(client_fd, &net_length_u, 4);
+        ssize_t n = recv_all(client_fd, &net_length_u, 4, &client->rx_state);
         if(n <= 0) { // n == 0 can ONLY mean disconnect for some reason??
             disconnect_client(client);
             return NULL;
@@ -93,7 +93,7 @@ void *client_manage(void *arg)
             if(!json) continue;
             json[net_length] = '\0';
 
-            if(recv_all(client_fd, json, net_length) == 0) {
+            if(recv_all(client_fd, json, net_length, &client->rx_state) == 0) {
                 disconnect_client(client);
                 return NULL;
             }
@@ -238,12 +238,15 @@ void handle_server_choice(void)
         strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
         client->fd = client_fd;
         init_client(client);
+
+
         if(is_client_abusive(client_ip)) {
             disconnect_client(client);
             continue;
         }
 
-        if(handshake_server(client->fd) == -1) {
+
+        if(handshake_server(client->fd, &client->tx_state, &client->rx_state) == -1) {
             disconnect_client(client);
             continue;
         }

@@ -55,8 +55,8 @@ static void handle_command(char *input, Client *client)
         if(!pr) return;
         uint32_t length = strlen(pr);
         uint32_t net_length = htonl(length);
-        send_all(client->fd, &net_length, 4);
-        send_all(client->fd, pr, length);
+        send_all(client->fd, &net_length, 4, &client->tx_state);
+        send_all(client->fd, pr, length, &client->tx_state);
 
         cJSON_Delete(json);
         if(pr) free(pr);
@@ -125,8 +125,8 @@ void *handle_chat(void *arg)
 
         uint32_t length = strlen(pr);
         uint32_t net_length = htonl(strlen(pr));
-        send_all(client_fd, &net_length, 4);
-        send_all(client_fd, pr, length);
+        send_all(client_fd, &net_length, 4, &client.tx_state);
+        send_all(client_fd, pr, length, &client.tx_state);
 
         cJSON_free(pr);
         cJSON_Delete(message);
@@ -169,17 +169,18 @@ void handle_client_choice(void)
         freeaddrinfo(res);
         return;
     }
+    Client *client = malloc(sizeof(Client));
+    client->fd = client_fd;
+    init_client(client);
 
-    if(handshake_client(client_fd) == -1) {
+
+    if(handshake_client(client_fd, &client->tx_state, &client->rx_state) == -1) {
+        free(client);
         return;
     }
 
     freeaddrinfo(res);
     printf("\033[2J");
-
-    Client *client = malloc(sizeof(Client));
-    client->fd = client_fd;
-    init_client(client);
 
     pthread_t chat_thread;
     pthread_create(&chat_thread, NULL, handle_chat, client);
@@ -191,7 +192,7 @@ void handle_client_choice(void)
     init_pair(1, COLOR_CYAN, -1);
     while(1) {
         uint32_t net_length_u;
-        recv_all(client_fd, &net_length_u, 4);
+        recv_all(client_fd, &net_length_u, 4, &client->rx_state);
 
         uint32_t net_length = ntohl(net_length_u);
 
@@ -202,7 +203,12 @@ void handle_client_choice(void)
         }
 
         json[net_length] = '\0';
-        size_t n = recv_all(client_fd, json, net_length);
+        size_t n = recv_all(client_fd, json, net_length, &client->rx_state);
+        if(n == 0) {
+            close(client_fd);
+            free(json);
+        }
+
         if(n > 0) {
             cJSON *parsed_json = cJSON_Parse(json);
             if(!parsed_json) {
@@ -225,8 +231,6 @@ void handle_client_choice(void)
 
             cJSON_Delete(parsed_json);
             free(json);
-        } else if(n == 0) {
-            close(client_fd);
         }
     }
     endwin();
