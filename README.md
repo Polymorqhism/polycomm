@@ -42,5 +42,6 @@
   - In earlier stages, this may occur more frequently to prevent vulnerabilities from affecting users' systems. It is in best interest to update as soon as possible BEFORE using polycomm.
 - A GUI version of polycomm is *NOT* officially endorsed. Use them with caution.
 - Users must be aware that using polycomm comes with implied risk. polycomm is NOT responsible for any misuse.
-- Without implementation of PSKs (which lose effectiveness in open-source programs), MiTM attacks are still VERY possible. Please make sure your network is safe before using polycomm.
+- Connecting to a server for the first time will allow users to store the public server key automatically in a file `known_servers.json`. The client will automatically compare it with the public key of the server in future connections. If there is tampering, the connection ends with a fool-proof warning.
+- MiTM protection works as long as users' clients is up-to-date with polycomm and the binary is not tampered with.
 - View the current version [here](version.txt).
