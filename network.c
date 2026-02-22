@@ -217,7 +217,7 @@ int handshake_client(int fd, crypto_secretstream_xchacha20poly1305_state *tx, cr
 
     int impostor = is_server_impostor(ip, server_pk_b64);
     if(impostor == 1) {
-        printf("\033[1;91;107m! KEY MISMATCH !\n\nThe server you just attempted to no longer matches the locally stored key. This may imply that your connection is being intercepted (MiTM attack), or the server key was changed.\nTo protect you, we have automatically disconnected you from the server.\n\n[%s] is the public key you just tried to connect to.\n\nBefore reconnecting, please ensure your network is safe. If you are absolutely sure your connection is secure, update known_servers.json manually.\n\nDO NOT IGNORE THIS MESSAGE. \033[0m\n", server_pk_b64);
+        printf("\033[1;91;107m! KEY MISMATCH !\n\nThe server you just attempted to connect to no longer matches the locally stored key. This may imply that your connection is being intercepted (MiTM attack), or the server key was changed.\nTo protect you, we have automatically disconnected you from the server.\n\n[%s] is the public key you just tried to connect to.\n\nBefore reconnecting, please ensure your network is safe. If you have confirmed directly on the server that the connection is secure, update known_servers.json manually.\n\nDO NOT IGNORE THIS MESSAGE. \033[0m\n", server_pk_b64);
 
         return -1;
     } else if(impostor == 2) {
