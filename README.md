@@ -25,7 +25,7 @@
 - polycomm, written in C, is a very simple system that uses TCP sockets to transmit messages with the help of cJSON.
 - There are two types of nodes: the server, and the client. Clients can connect to the server to communicate. The server handles the clients.
 - The design is kept intentionally simple to minimize the number of attack surfaces and points of collapse.
-- Full libsodium implementation for encryption is planned for the near future.
+- With libsodium encryption implemented, all messages *should* be inaccessible to packet sniffing or MiTM attacks at the network level.
 
 ## Why?
 - polycomm aims to allow users to communicate with minimal overarching organizational surveillance.
@@ -41,5 +41,5 @@
 - Any changes in users' local versions will get flagged and prompt user acknowledgement before usage.
   - In earlier stages, this may occur more frequently to prevent vulnerabilities from affecting users' systems. It is in best interest to update as soon as possible BEFORE using polycomm.
 - A GUI version of polycomm is *NOT* officially endorsed. Use them with caution.
-- Users must be implicitly aware that polycomm is under development and should never be used for any matter which may concern security in the slightest until v1.0.0 is released.
+- Users must be aware that using polycomm comes with implied risk. polycomm is NOT responsible for any misuse.
 - View the current version [here](version.txt).
