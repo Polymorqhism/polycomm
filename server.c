@@ -133,7 +133,7 @@ void *client_manage(void *arg)
             cJSON_AddStringToObject(sanitised, "author", client->username);
 
             char *pr_j = cJSON_PrintUnformatted(sanitised);
-            printf("%.16s: %128s\n", client->username, message->valuestring);
+            printf("%.16s: %.128s\n", client->username, message->valuestring);
 
             uint32_t length = strlen(pr_j);
             uint32_t net_length_j = htonl(strlen(pr_j));

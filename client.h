@@ -1,7 +1,7 @@
 #include <arpa/inet.h>
 #include <sodium.h>
 #include <pthread.h>
-#define USER_MAXLEN 32
+#define USER_MAXLEN 16
 #define MAX_CLIENTS 5000
 
 typedef struct {
