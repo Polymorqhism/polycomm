@@ -96,93 +96,99 @@ void *client_manage(void *arg)
     while(1) {
         uint32_t net_length_u;
         ssize_t n = recv_all(client_fd, &net_length_u, 4, &client->rx_state);
-        if(n <= 0) { // n == 0 can ONLY mean disconnect for some reason??
+        if(n <= 0) { // n == 0 means disconnect
             disconnect_client(client);
             return NULL;
         }
 
         uint32_t net_length = ntohl(net_length_u);
 
-        if(net_length < 1048576) { // <--- thats one MB
-            char *json = (char *) malloc(net_length+1);
-            if(!json) continue;
-            json[net_length] = '\0';
+        if(net_length > 1048576) { // <--- thats one MB
+            puts("Max limit (1 MB) per receive exceeded, rejecting.");
+            disconnect_client(client);
+            return NULL;
+        }
 
-            if(recv_all(client_fd, json, net_length, &client->rx_state) == 0) {
-                disconnect_client(client);
-                return NULL;
+
+        char *json = (char *) malloc(net_length+1);
+        if(!json) continue;
+        json[net_length] = '\0';
+
+        if(recv_all(client_fd, json, net_length, &client->rx_state) == 0) {
+            disconnect_client(client);
+            return NULL;
+        }
+
+        cJSON *parsed_json = cJSON_Parse(json);
+        if(!parsed_json) {
+            free(json);
+            continue;
+        }
+
+        cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+        cJSON *request = cJSON_GetObjectItemCaseSensitive(parsed_json, "request");
+        if(message && strcmp(message->valuestring, "") && client->messages_remaining > 0) {
+            cJSON *sanitised = cJSON_CreateObject();
+            cJSON_AddStringToObject(sanitised, "message", message->valuestring);
+            cJSON_AddStringToObject(sanitised, "author", client->username);
+
+            char *pr_j = cJSON_PrintUnformatted(sanitised);
+            printf("%.16s: %128s\n", client->username, message->valuestring);
+
+            uint32_t length = strlen(pr_j);
+            uint32_t net_length_j = htonl(strlen(pr_j));
+            broadcast_clients(&net_length_j, 4);
+            broadcast_clients(pr_j, length);
+            client->messages_remaining--;
+            if(pr_j) {
+                free(pr_j);
+            }
+            cJSON_Delete(sanitised);
+        } else if(request && strcmp(request->valuestring, "")) {
+            cJSON *username = cJSON_GetObjectItemCaseSensitive(parsed_json, "target");
+            if(!username || client->messages_remaining <= 0) {
+                if(json) {
+                    free(json);
+                    cJSON_Delete(parsed_json);
+                }
+                continue;
             }
 
-            cJSON *parsed_json = cJSON_Parse(json);
-            if(!parsed_json) {
+            int found = 0;
+
+            pthread_mutex_lock(&clients_mutex);
+            for(int i = 0; i<client_n; i++) {
+                if(strcmp(clients[i]->username, username->valuestring) == 0) {
+                    found = 1;
+                }
+            }
+            pthread_mutex_unlock(&clients_mutex);
+            if(found == 1) {
+                cJSON_Delete(parsed_json);
                 free(json);
                 continue;
             }
 
-            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
-            cJSON *request = cJSON_GetObjectItemCaseSensitive(parsed_json, "request");
-            if(message && strcmp(message->valuestring, "") && client->messages_remaining > 0) {
-                cJSON_AddStringToObject(parsed_json, "author", client->username);
+            cJSON *changed = cJSON_CreateObject();
+            char change_msg[128];
+            snprintf(change_msg, sizeof(change_msg), "%.16s changed their username to %.16s", client->username, username->valuestring);
+            cJSON_AddStringToObject(changed, "message", change_msg);
+            cJSON_AddStringToObject(changed, "author", "[SERVER]");
+            char *pr = cJSON_PrintUnformatted(changed);
 
-                char *pr_j = cJSON_PrintUnformatted(parsed_json);
-                printf("%.16s: %128s\n", client->username, message->valuestring);
+            uint32_t length = strlen(pr);
+            uint32_t net_length = htonl(strlen(pr));
+            broadcast_clients(&net_length, 4);
+            broadcast_clients(pr, length);
 
-                uint32_t length = strlen(pr_j);
-                uint32_t net_length_j = htonl(strlen(pr_j));
-                broadcast_clients(&net_length_j, 4);
-                broadcast_clients(pr_j, length);
-                client->messages_remaining--;
-                if(pr_j) {
-                    free(pr_j);
-                }
-            } else if(request && strcmp(request->valuestring, "")) {
-                cJSON *username = cJSON_GetObjectItemCaseSensitive(parsed_json, "target");
-                if(!username || client->messages_remaining <= 0) {
-                    if(json) {
-                        free(json);
-                        cJSON_Delete(parsed_json);
-                    }
-                    continue;
-                }
-
-                int found = 0;
-
-                pthread_mutex_lock(&clients_mutex);
-                for(int i = 0; i<client_n; i++) {
-                    if(strcmp(clients[i]->username, username->valuestring) == 0) {
-                        found = 1;
-                    }
-                }
-                pthread_mutex_unlock(&clients_mutex);
-                if(found == 1) {
-                    cJSON_Delete(parsed_json);
-                    free(json);
-                    continue;
-                }
-
-                cJSON *changed = cJSON_CreateObject();
-                char change_msg[128];
-                snprintf(change_msg, sizeof(change_msg), "%.16s changed their username to %.16s", client->username, username->valuestring);
-                cJSON_AddStringToObject(changed, "message", change_msg);
-                cJSON_AddStringToObject(changed, "author", "[SERVER]");
-                char *pr = cJSON_PrintUnformatted(changed);
-
-                uint32_t length = strlen(pr);
-                uint32_t net_length = htonl(strlen(pr));
-                broadcast_clients(&net_length, 4);
-                broadcast_clients(pr, length);
-
-                client->messages_remaining--;
-                if(pr) free(pr);
-                cJSON_Delete(changed);
-                free(client->username);
-                client->username = strdup(username->valuestring);
-            }
-            cJSON_Delete(parsed_json);
-            free(json);
-        } else {
-            puts("Max limit (1 MB) per receive exceeded, rejecting.");
+            client->messages_remaining--;
+            if(pr) free(pr);
+            cJSON_Delete(changed);
+            free(client->username);
+            client->username = strdup(username->valuestring);
         }
+        cJSON_Delete(parsed_json);
+        free(json);
     }
 
     return NULL;
