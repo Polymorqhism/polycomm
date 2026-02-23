@@ -27,6 +27,21 @@ static void broadcast_clients(void *buf, size_t len)
     pthread_mutex_unlock(&clients_mutex);
 }
 
+static void *refill_messages(void *args) // args to satisfy pthread
+{
+    while(1) {
+        sleep(1);
+
+        pthread_mutex_lock(&clients_mutex);
+        for(int i = 0; i < client_n; i++) {
+            if(clients[i]->messages_remaining < 5) {
+                clients[i]->messages_remaining++;
+            }
+        }
+        pthread_mutex_unlock(&clients_mutex);
+    }
+}
+
 void disconnect_client(Client *client)
 {
     if (!client) return;
@@ -49,7 +64,7 @@ void disconnect_client(Client *client)
 
     cJSON *left = cJSON_CreateObject();
     char left_msg[64];
-    snprintf(left_msg, sizeof(left_msg), "%s left", client->username);
+    snprintf(left_msg, sizeof(left_msg), "%.16s left", client->username);
     cJSON_AddStringToObject(left, "message", left_msg);
     cJSON_AddStringToObject(left, "author", "[SERVER]");
     char *pr = cJSON_PrintUnformatted(left);
@@ -106,22 +121,23 @@ void *client_manage(void *arg)
 
             cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
             cJSON *request = cJSON_GetObjectItemCaseSensitive(parsed_json, "request");
-            if(message && strcmp(message->valuestring, "")) {
+            if(message && strcmp(message->valuestring, "") && client->messages_remaining > 0) {
                 cJSON_AddStringToObject(parsed_json, "author", client->username);
 
                 char *pr_j = cJSON_PrintUnformatted(parsed_json);
-                printf("%32s: %128s\n", client->username, message->valuestring);
+                printf("%.16s: %128s\n", client->username, message->valuestring);
 
                 uint32_t length = strlen(pr_j);
                 uint32_t net_length_j = htonl(strlen(pr_j));
                 broadcast_clients(&net_length_j, 4);
                 broadcast_clients(pr_j, length);
+                client->messages_remaining--;
                 if(pr_j) {
                     free(pr_j);
                 }
             } else if(request && strcmp(request->valuestring, "")) {
                 cJSON *username = cJSON_GetObjectItemCaseSensitive(parsed_json, "target");
-                if(!username) {
+                if(!username || client->messages_remaining <= 0) {
                     if(json) {
                         free(json);
                         cJSON_Delete(parsed_json);
@@ -139,12 +155,14 @@ void *client_manage(void *arg)
                 }
                 pthread_mutex_unlock(&clients_mutex);
                 if(found == 1) {
+                    cJSON_Delete(parsed_json);
+                    free(json);
                     continue;
                 }
 
                 cJSON *changed = cJSON_CreateObject();
                 char change_msg[128];
-                snprintf(change_msg, sizeof(change_msg), "%32s changed their username to %32s", client->username, username->valuestring);
+                snprintf(change_msg, sizeof(change_msg), "%.16s changed their username to %.16s", client->username, username->valuestring);
                 cJSON_AddStringToObject(changed, "message", change_msg);
                 cJSON_AddStringToObject(changed, "author", "[SERVER]");
                 char *pr = cJSON_PrintUnformatted(changed);
@@ -154,6 +172,7 @@ void *client_manage(void *arg)
                 broadcast_clients(&net_length, 4);
                 broadcast_clients(pr, length);
 
+                client->messages_remaining--;
                 if(pr) free(pr);
                 cJSON_Delete(changed);
                 free(client->username);
@@ -174,13 +193,13 @@ static int is_client_abusive(char *ip)
     int abusive = 0;
     int ip_counter = 0;
     pthread_mutex_lock(&clients_mutex);
-    for(int i = 0; i<client_n; i++) {
-        if(ip_counter == MAX_SAME_CLIENTS) {
-            abusive = 1;
-            break;
-        }
+    for(int i = 0; i < client_n; i++) {
         if(strcmp(clients[i]->ip, ip) == 0) {
             ip_counter++;
+        }
+        if(ip_counter >= MAX_SAME_CLIENTS) {
+            abusive = 1;
+            break;
         }
     }
     pthread_mutex_unlock(&clients_mutex);
@@ -222,7 +241,9 @@ void handle_server_choice(void)
         perror("Listening failed.");
         exit(EXIT_FAILURE);
     }
-
+    pthread_t refill;
+    pthread_create(&refill, NULL, refill_messages, NULL);
+    pthread_detach(refill);
     while(1) {
         struct sockaddr_in client_addr;
         socklen_t client_addrlen = sizeof(client_addr);
@@ -238,24 +259,23 @@ void handle_server_choice(void)
         strncpy(client->ip, client_ip, INET_ADDRSTRLEN);
         client->fd = client_fd;
         init_client(client);
-
+        client->messages_remaining = 5;
 
         if(is_client_abusive(client_ip)) {
             disconnect_client(client);
             continue;
         }
 
-
         if(handshake_server(client->fd, &client->tx_state, &client->rx_state) == -1) {
             disconnect_client(client);
             continue;
         }
 
-        printf("Client accepted from %s with username %s.\n", client_ip, client->username);
+        printf("Client accepted from %s with username %.16s.\n", client_ip, client->username);
 
         cJSON *joined = cJSON_CreateObject();
         char join_msg[64];
-        snprintf(join_msg, sizeof(join_msg), "%s joined", client->username);
+        snprintf(join_msg, sizeof(join_msg), "%.16s joined", client->username);
         cJSON_AddStringToObject(joined, "message", join_msg);
         cJSON_AddStringToObject(joined, "author", "[SERVER]");
         char *pr = cJSON_PrintUnformatted(joined);

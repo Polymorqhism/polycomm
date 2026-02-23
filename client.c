@@ -93,6 +93,7 @@ void init_client(Client *client)
 
     pthread_mutex_unlock(&clients_mutex);
 }
+
 void *handle_chat(void *arg)
 {
     Client client = *(Client *) arg;

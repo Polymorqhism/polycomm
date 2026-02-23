@@ -10,6 +10,7 @@ typedef struct {
     char *username;
     crypto_secretstream_xchacha20poly1305_state tx_state;
     crypto_secretstream_xchacha20poly1305_state rx_state;
+    int messages_remaining;
 } Client;
 
 extern int username_id;
