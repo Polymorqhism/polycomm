@@ -63,4 +63,4 @@
   - Linux, libsodium, cURL.
 
 ## Credits:
-- @0a9g (@0xko) on Discord -> penetration testing.
+- @45pv on Discord -> bug hunting & penetration testing.
