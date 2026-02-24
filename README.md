@@ -61,3 +61,6 @@
 - Anti-tamper/corruption packet handling.
 - Quick setup, minimal prerequisites:
   - Linux, libsodium, cURL.
+
+## Credits:
+- @0a9g (@0xko) on Discord -> penetration testing.
