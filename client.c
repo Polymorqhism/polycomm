@@ -135,7 +135,25 @@ void *handle_chat(void *arg)
     return NULL;
 }
 
+int display_chat_message(cJSON *parsed_json)
+{
 
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
+    cJSON *author = cJSON_GetObjectItemCaseSensitive(parsed_json, "author");
+    if((message && author) && (cJSON_IsString(message) && cJSON_IsString(author))) {
+        if(strcmp(author->valuestring, "[SERVER]") == 0) {
+            wattron(output_win, COLOR_PAIR(1));
+            wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
+            wattroff(output_win, COLOR_PAIR(1));
+            wrefresh(output_win);
+            return 0;
+        }
+        wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
+        wrefresh(output_win);
+    }
+
+    return 2;
+}
 
 void handle_client_choice(void)
 {
@@ -218,25 +236,16 @@ void handle_client_choice(void)
                 free(json);
                 continue;
             }
+            int ret = display_chat_message(parsed_json);
+            if(ret == 0) {
+                cJSON_Delete(parsed_json);
+                free(json);
+                continue;
 
-            cJSON *message = cJSON_GetObjectItemCaseSensitive(parsed_json, "message");
-            cJSON *author = cJSON_GetObjectItemCaseSensitive(parsed_json, "author");
-            if((message && author) && (cJSON_IsString(message) && cJSON_IsString(author))) {
-                if(strcmp(author->valuestring, "[SERVER]") == 0) {
-                    wattron(output_win, COLOR_PAIR(1));
-                    wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
-                    wattroff(output_win, COLOR_PAIR(1));
-                    wrefresh(output_win);
-                    cJSON_Delete(parsed_json);
-                    free(json);
-                    continue;
-                }
-                wprintw(output_win, "%s: %s\n", author->valuestring, message->valuestring);
-                wrefresh(output_win);
+            } else if(ret == 1) {
+                cJSON_Delete(parsed_json);
+                free(json);
             }
-
-            cJSON_Delete(parsed_json);
-            free(json);
         }
     }
     endwin();
