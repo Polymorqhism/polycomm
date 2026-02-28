@@ -61,6 +61,8 @@
 - Anti-tamper/corruption packet handling.
 - Quick setup, minimal prerequisites:
   - Linux, libsodium, cURL.
+- Messages stored locally, in `.[server-ip].json` files.
+
 
 ## Credits:
 - @45pv on Discord -> bug hunting & penetration testing.

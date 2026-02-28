@@ -211,6 +211,30 @@ void handle_client_choice(void)
     start_color();
     use_default_colors();
     init_pair(1, COLOR_CYAN, -1);
+
+    char file_name[64];
+
+    snprintf(file_name, sizeof(file_name), ".%s.json", ip);
+
+    FILE *file = fopen(file_name, "a+");
+
+    if(!file) {
+        perror("Couldn't create the local message log file.");
+    }
+    else {
+        char message[4096];
+
+        while(fgets(message, sizeof(message), file)) {
+            message[strcspn(message, "\n")] = '\0';
+            cJSON *parsed = cJSON_Parse(message);
+
+            if(parsed) {
+                display_chat_message(parsed);
+                cJSON_Delete(parsed);
+            }
+        }
+    }
+
     while(1) {
         uint32_t net_length_u;
         recv_all(client_fd, &net_length_u, 4, &client->rx_state);
@@ -228,6 +252,7 @@ void handle_client_choice(void)
         if(n == 0) {
             close(client_fd);
             free(json);
+            continue;
         }
 
         if(n > 0) {
@@ -237,15 +262,22 @@ void handle_client_choice(void)
                 continue;
             }
             int ret = display_chat_message(parsed_json);
+
+            if(file) {
+                fprintf(file, "%s\n", json);
+                fflush(file);
+            }
+
             if(ret == 0) {
                 cJSON_Delete(parsed_json);
                 free(json);
                 continue;
 
-            } else if(ret == 1) {
+            } else if(ret == 2) {
                 cJSON_Delete(parsed_json);
                 free(json);
             }
+            continue;
         }
     }
     endwin();
