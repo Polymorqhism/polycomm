@@ -1,10 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <ncurses.h>
 #include "polycomm.h"
 
 const char banner[188] =    "┌─┐┌─┐┬ ┬ ┬┌─┐┌─┐┌┬┐┌┬┐\n"
-                            "├─┘│ ││ └┬┘│  │ │││││││\n"
-                            "┴  └─┘┴─┘┴ └─┘└─┘┴ ┴┴ ┴\n";
+    "├─┘│ ││ └┬┘│  │ │││││││\n"
+    "┴  └─┘┴─┘┴ └─┘└─┘┴ ┴┴ ┴\n";
 int get_choice(void)
 {
     printf("Are you the client or the server (1 - client; 2 - server)? ");
@@ -32,25 +33,23 @@ WINDOW *input_win;
 
 void init_ncurses(void)
 {
-        initscr();
-        cbreak();
-        keypad(stdscr, TRUE);
-
-        if (has_colors()) {
-            start_color();
-            use_default_colors();
-            init_pair(1, COLOR_CYAN, -1);
-        }
-
-        int rows, cols;
-        getmaxyx(stdscr, rows, cols);
-
-        output_win = newwin(rows - 1, cols, 0, 0);
-        input_win  = newwin(1, cols, rows - 1, 0);
-
-        scrollok(output_win, TRUE);
-        wmove(input_win, 0, 0);
-        wrefresh(input_win);
-        wrefresh(output_win);
+    initscr();
+    cbreak();
+    keypad(stdscr, TRUE);
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    if(rows < 5 || cols < 20) {
+        endwin();
+        fprintf(stderr, "Terminal is too small.");
+        exit(1);
+    }
+    output_win = newwin(rows - 1, cols, 0, 0);
+    input_win  = newwin(1, cols, rows - 1, 0);
+    keypad(input_win, TRUE);
+    scrollok(output_win, TRUE);
+    idlok(output_win, TRUE);
+    wmove(input_win, 0, 0);
+    wrefresh(input_win);
+    wrefresh(output_win);
 
 }
