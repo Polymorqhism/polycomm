@@ -18,7 +18,7 @@
 > You must host your own servers.
 
 > [!CAUTION]
-> This is unfinished and NOT production ready. Servers may see your public IP. Do not delete the `known_servers.json` file if you wish to keep MiTM protection against servers you've already connected to.
+> This is not completely production ready. Servers may see your public IP. Do not delete the `known_servers.json` file if you wish to keep MiTM protection against servers you've already connected to.
 ---
 
 ## How?
@@ -30,12 +30,12 @@
 - polycomm aims to allow users to communicate with minimal overarching organizational surveillance.
 
 ## polycomm is not:
-- An anonymous platform by default. All data is linked to your IP,
+- An anonymous platform by default - servers can see your IP.
 - a large-scale platform - server performance degrades after 5K users,
-- aiming for mass-use,
-- plug and play,
-- protecting you from first-connection MiTM attacks.
-- 100% safe or secure from metadata linking.
+- aiming for mass-use - the terminal user interface is not for everyone,
+- plug and play - setting up a server is tedious,
+- protecting you from first-connection MiTM attacks - uses TOFU (Trust On First Use).
+- 100% safe or secure from metadata linking - timestamps are not hidden.
 
 ## More Info:
 - Any changes in users' local versions will get flagged and prompt user acknowledgement before usage.
@@ -62,7 +62,10 @@
 - Quick setup, minimal prerequisites:
   - Linux, libsodium, cURL.
 - Messages stored locally, in `.[server-ip].json` files.
-
+  - You cannot see messages that were sent while you were not connected.
 
 ## Credits:
 - @45pv on Discord -> bug hunting & penetration testing.
+
+### Note:
+- As of the latest version, this software is partially ready for daily use.
