@@ -24,7 +24,7 @@
 ## How?
 - polycomm, written in C, is a very simple system that uses TCP sockets to transmit messages with the help of cJSON[^2].
 - The design is kept intentionally simple to minimize the number of attack surfaces and points of collapse.
-- Clients can chat to all other clients, where all messages are broadcasted between clients.
+- Clients can chat to all other clients, where all messages are broadcast between clients.
 - Full encryption implemented for the transport layer.
   - Immediately on starting polycomm, a version check occurs. If the version is off, users will be made aware of the mismatch, prompting update. It can be declined, however cannot be ignored.
   - When a client connects, a handshake occurs between server where session key exchange occurs with the help of libsodium.
